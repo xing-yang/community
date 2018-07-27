@@ -9,7 +9,9 @@ Many storage systems (GCE PD, Amazon EBS, etc.) provide the ability to create "s
 
 As the initial effort to support snapshot in Kubernetes, volume snapshotting has been released as a prototype in Kubernetes 1.8. An external controller and provisioner (i.e. two separate binaries) have been added in the [external storage repo](https://github.com/kubernetes-incubator/external-storage/tree/master/snapshot). The prototype currently supports GCE PD, AWS EBS, OpenStack Cinder, GlusterFS, and Kubernetes hostPath volumes. Volume snapshots APIs are using [CRD](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions/).
 
-To continue that effort, this design is proposed to add the snapshot support for CSI Volume Drivers. Because the overal trend in Kubernetes is to keep the core APIs as small as possible and use CRD for everything else, this proposal will add CRD definitions to represent snapshots, add external snapshot controller to handle volume snapshotting, and modify in-tree PV controller and out-of-tree external provisioner to support restore volume from snapshot. To be consistent with the existing CSI Volume Driver support documented [here](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md), a sidecar "Kubernetes to CSI" proxy container called "external-snapshotter" will be provided to watch the Kubernetes API on behalf of the out-of-tree CSI Volume Driver and trigger the appropriate operations (i.e., create snapshot and delete snapshot) against the "CSI Volume Driver" container. The CSI snapshot spec is proposed [here](https://github.com/container-storage-interface/spec/pull/224).
+To continue that effort, this design is proposed to add the snapshot support for CSI Volume Drivers. Because the overal trend in Kubernetes is to keep the core APIs as small as possible and use CRD for everything else, this proposal adds CRD definitions to represent snapshots, and an external snapshot controller to handle volume snapshotting. Out-of-tree external provisioner can be upgraded to support creating volume from snapshot. In this design, only CSI volume drivers will be supported. The CSI snapshot spec is proposed [here](https://github.com/container-storage-interface/spec/pull/224).
+
+To be consistent with the existing CSI Volume Driver support documented [here](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md), a sidecar "Kubernetes to CSI" proxy container called "external-snapshotter" will be provided to watch the Kubernetes API on behalf of the out-of-tree CSI Volume Driver and trigger the appropriate operations (i.e., create snapshot and delete snapshot) against the "CSI Volume Driver" container. 
 
 
 ## Objectives
@@ -39,7 +41,7 @@ The following are non-goals for the current phase, but will be considered at a l
 
 ## Design Overview
 
-With this proposal, volume snapshots are considered as another type of storage resources managed by Kubernetes. Therefore the snapshot API and controller follow the design of existing volume management. There are two APIs, VolumeSnapshot and VolumeSnapshotContent, which are similar to the structure of PersistentVolumeClaim and PersistentVolume. The external snapshot controller functions also similar to the in-tree PV controller. With the snapshots APIs, we also propose to add data sources in PersistentVolumeClaim (PVC) API in order to support restore snapshots to volumes. The following section explains in more details about the APIs and the controller design.
+With this proposal, volume snapshots are considered as another type of storage resources managed by Kubernetes. Therefore the snapshot API and controller follow the design of existing volume management. There are three APIs, VolumeSnapshot and VolumeSnapshotContent, and VolumeSnapshotClass which are similar to the structure of PersistentVolumeClaim and PersistentVolume, and storageClass. The external snapshot controller functions similar to the in-tree PV controller. With the snapshots APIs, we also propose to add a new data source struct in PersistentVolumeClaim (PVC) API in order to support restore snapshots to volumes. The following section explains in more details about the APIs and the controller design.
 
 
 ## Design Details
@@ -92,18 +94,15 @@ type VolumeSnapshotSpec struct {
 
 type VolumeSnapshotStatus struct {
         // CreatedAt is the time the snapshot was successfully created. If it is set,
-	// it means the snapshot was created; Otherwise the snapshot was not created.
+	// it means the snapshot was created, and application can be resumed if it was
+	// previiously frozen before taking the snapshot; Otherwise the snapshot was not created.
         // +optional
         CreatedAt *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
 
         // AvailableAt is the time the snapshot was successfully created and available
-	// for use. A snapshot MUST have already been created before it can be available.
-        // If a snapshot was available, it indicates the snapshot was created.
-        // When the snapshot was created but not available yet, the application can be
-        // resumed if it was previously frozen before taking the snapshot. In this case,
-        // it is possible that the snapshot is being uploaded to the cloud. For example,
-        // both GCE and AWS support uploading of the snapshot after it is cut as part of
-        // the Create Snapshot process.
+	// for use. Some cloud volume providers will upload the snapshot to cloud storage after
+	// it is being created, so the snapshot will become available sometime after snapshot is created.
+	// For other plugins, the snapshot might be available at the same time when the snapshot is created.
         // If the timestamp AvailableAt is set, it means the snapshot was available;
         // Otherwise the snapshot was not available.
         // +optional
@@ -117,8 +116,6 @@ type VolumeSnapshotStatus struct {
 }
 
 ```
-
-`CreatedAt` will be set when the snapshot is cut. `AvailableAt` will be set when the snapshot is cut and available for use.
 
 If an error occurs before the snapshot is cut, `Error` will be set and none of `CreatedAt`/`AvailableAt` will be set.
 If an error occurs after the snapshot is cut but before it is available, `Error` will be set and `CreatedAt` should still be set, but `AvailableAt` will not be set.
@@ -194,7 +191,37 @@ type CSIVolumeSnapshotSource struct {
 
 ```
 
-#### The `DataSource` Object in PVC
+#### The `VolumeSnapshotClass` Object
+
+A new VolumeSnapshotClass API object will be added instead of resuing the existing StorageClass, in order to avoid mixing parameters between snapshots and volumes. Each CSI Volume Driver can have its own default VolumeSnapshotClass. If VolumeSnapshotClass is not provided, a default will be used. It allows to add new parameters for snapshots.
+
+```
+
+type VolumeSnapshotClass struct {
+        metav1.TypeMeta `json:",inline"`
+        // +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Snapshotter is the driver expected to handle this VolumeSnapshotClass.
+	// This value may not be empty.
+	Snapshotter string
+
+	// Parameters holds parameters for the snapshotter.
+        // These values are opaque to the system and are passed directly
+        // to the snapshotter. The only validation done on keys is that they are
+        // not empty. The maximum number of parameters is
+        // 512, with a cumulative max size of 256K
+        // +optional
+	Parameters map[string]string
+}
+
+
+```
+### Volume API Changes
+
+With Snapshot API avaialble, users could provision volumes from snapshot and data will be prepopulated to the volumes. Also considering clone and other possible storage operations, there could be many different types of sources used for populating the data to the volumes. In this proposal, we add a general "DataSource" which could be used to represent different types of data sources.
+
+### The `DataSource` Object in PVC
 
 Add a new `DataSource` field into PVC and PV to represent the source of the data which is prepopulated to the provisioned volume. If an external-provisioner does not understand the new `DataSource` field and does not pre-populate the new volume, PV/PVC controller should be able to detect that (e.g. PVC has `DataSource` but PV does not) and fail the operation.
 
@@ -234,34 +261,8 @@ type TypedLocalObjectReference struct {
 
 ```
 
-In the first version, only VolumeSnapshot will be a supported `Type` for data source object reference. PersistentVolumeClaim will be added in a future version. If unsupported `Type` is used, the PV Controller SHALL bail out of the operation.
+In the first version, only VolumeSnapshot will be a supported `Type` for data source object reference. PersistentVolumeClaim will be added in a future version. If unsupported `Type` is used, the PV Controller SHALL fail the operation.
 
-
-#### The `VolumeSnapshotClass` Object
-
-A new VolumeSnapshotClass API object will be added to avoid mixing parameters between snapshots and volumes. Each CSI Volume Driver can have its own default VolumeSnapshotClass. If VolumeSnapshotClass is not provided, a default will be used. It allows to add new parameters for snapshots.
-
-```
-
-type VolumeSnapshotClass struct {
-        metav1.TypeMeta `json:",inline"`
-        // +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Snapshotter is the driver expected to handle this VolumeSnapshotClass.
-	// This value may not be empty.
-	Snapshotter string
-
-	// Parameters holds parameters for the snapshotter.
-        // These values are opaque to the system and are passed directly
-        // to the snapshotter. The only validation done on keys is that they are
-        // not empty. The maximum number of parameters is
-        // 512, with a cumulative max size of 256K
-        // +optional
-	Parameters map[string]string
-}
-
-```
 
 #### Add `DataSource` to `StorageClass`
 
