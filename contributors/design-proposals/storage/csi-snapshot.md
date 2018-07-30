@@ -37,12 +37,10 @@ The following are non-goals for the current phase, but will be considered at a l
 * Goal 5: Provide higher-level management, such as backing up and restoring a pod and statefulSet, and creating a consistent group of snapshots.
 
 
-## Design Overview
+## Design Details
 
 With this proposal, volume snapshots are considered as another type of storage resources managed by Kubernetes. Therefore the snapshot API and controller follow the design of existing volume management. There are three APIs, VolumeSnapshot and VolumeSnapshotContent, and VolumeSnapshotClass which are similar to the structure of PersistentVolumeClaim and PersistentVolume, and storageClass. The external snapshot controller functions similar to the in-tree PV controller. With the snapshots APIs, we also propose to add a new data source struct in PersistentVolumeClaim (PVC) API in order to support restore snapshots to volumes. The following section explains in more details about the APIs and the controller design.
 
-
-## Design Details
 
 ### Snapshot API Design
 
