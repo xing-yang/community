@@ -292,18 +292,14 @@ As the figure below shows, the CSI snapshot controller architecture consists of 
 Please note that in current design, when the storage system fails to create snapshot, retry will not be performed in the controller. This is because users may not want to retry when taking consistent snapshots or scheduled snapshots when the timing of the snapshot creation is important. In a future version, a maxRetries flag or retry termination timestamp will be added to allow users to control whether retries are needed.
 
 
-### Changes in PV Controller and CSI External Provisioner
+#### Changes in CSI External Provisioner
 
-Both the CSI External Provisioner and the in-tree PV Controller will be modified to support provisioning a volume from a snapshot data source.
+`DataSource` is available in both `StorageClass` and `PersistentVolumeClaim` to represent the source of the data which is prepopulated to the provisioned volume. If `DataSource` is added to both during volume provisioning, `DataSource` in `PersistentVolumeClaim` will override `DataSource` in `StorageClass`. 
 
-`DataSource` is added in both `StorageClass` and `PersistentVolumeClaim` to represent the source of the data which is prepopulated to the provisioned volume. If `DataSource` is added to both during volume provisioning, `DataSource` in `PersistentVolumeClaim` will override `DataSource` in `StorageClass`. 
-
-The operation of the provisioning of a volume from a snapshot data source will be handled by the out-of-tree CSI External Provisioner.
-
-The in-tree PV Controller will handle the binding of the PV and PVC once they are ready.
+The operation of the provisioning of a volume from a snapshot data source will be handled by the out-of-tree CSI External Provisioner. The in-tree PV Controller will handle the binding of the PV and PVC once they are ready.
  
 
-### CSI Volume Driver Snapshot Support
+#### CSI Volume Driver Snapshot Support
 
 The out-of-tree CSI Volume Driver creates a snapshot on the backend storage system or cloud provider, and calls CreateSnapshot through CSI ControllerServer and returns CreateSnapshotResponse. The out-of-tree CSI Volume Driver needs to implement the following functions:
 
