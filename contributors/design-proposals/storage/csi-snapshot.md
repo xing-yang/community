@@ -39,7 +39,7 @@ The following are non-goals for the current phase, but will be considered at a l
 
 ## Design Details
 
-With this proposal, volume snapshots are considered as another type of storage resources managed by Kubernetes. Therefore the snapshot API and controller follow the design of existing volume management. There are three APIs, VolumeSnapshot and VolumeSnapshotContent, and VolumeSnapshotClass which are similar to the structure of PersistentVolumeClaim and PersistentVolume, and storageClass. The external snapshot controller functions similar to the in-tree PV controller. With the snapshots APIs, we also propose to add a new data source struct in PersistentVolumeClaim (PVC) API in order to support restore snapshots to volumes. The following section explains in more details about the APIs and the controller design.
+In this proposal, volume snapshots are considered as another type of storage resources managed by Kubernetes. Therefore the snapshot API and controller follow the design pattern of existing volume management. There are three APIs, VolumeSnapshot and VolumeSnapshotContent, and VolumeSnapshotClass which are similar to the structure of PersistentVolumeClaim and PersistentVolume, and storageClass. The external snapshot controller functions similar to the in-tree PV controller. With the snapshots APIs, we also propose to add a new data source struct in PersistentVolumeClaim (PVC) API in order to support restore snapshots to volumes. The following section explains in more details about the APIs and the controller design.
 
 
 ### Snapshot API Design
@@ -217,7 +217,7 @@ type VolumeSnapshotClass struct {
 
 With Snapshot API avaialble, users could provision volumes from snapshot and data will be prepopulated to the volumes. Also considering clone and other possible storage operations, there could be many different types of sources used for populating the data to the volumes. In this proposal, we add a general "DataSource" which could be used to represent different types of data sources.
 
-### The `DataSource` Object in PVC
+#### The `DataSource` Object in PVC
 
 Add a new `DataSource` field into both PVC and PV to represent the source of the data which is prepopulated to the provisioned volume. If an external-provisioner does not understand the new `DataSource` field and does not pre-populate the new volume, PV/PVC controller should be able to detect that (e.g. PVC has `DataSource` but PV does not) and fail the operation.
 
