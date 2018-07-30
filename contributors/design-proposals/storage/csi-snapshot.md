@@ -276,6 +276,7 @@ type StorageClass struct {
 
 ### Snapshot Controller Design
 As the figure below shows, the CSI snapshot controller architecture consists of an external snapshotter which talks to out-of-tree CSI Volume Driver over socket (/run/csi/socket by default, configurable by -csi-address). External snapshotter is part of Kubernetes implementation of [Container Storage Interface (CSI)](https://github.com/container-storage-interface/spec). It is an external controller that monitors `VolumeSnapshot` and `VolumeSnapshotContent` objects and creates/deletes snapshot.
+![CSI Snapshot Diagram](csi-snapshot_diagram.png?raw=true "CSI Snapshot Diagram")
 
 * External snapshotter uses ControllerGetCapabilities to find out if CSI driver supports CREATE_DELETE_SNAPSHOT calls. It degrades to trivial mode if not.
 
@@ -287,9 +288,7 @@ As the figure below shows, the CSI snapshot controller architecture consists of 
 
 * External snapshotter is running in the sidecar along with external-attacher and external-provisioner for each CSI Volume Driver.
 
-![CSI Snapshot Diagram](csi-snapshot_diagram.png?raw=true "CSI Snapshot Diagram")
-
-Please note that in current design, when the storage system fails to create snapshot, retry will not be performed in the controller. This is because users may not want to retry when taking consistent snapshots or scheduled snapshots when the timing of the snapshot creation is important. In a future version, a maxRetries flag or retry termination timestamp will be added to allow users to control whether retries are needed.
+* In current design, when the storage system fails to create snapshot, retry will not be performed in the controller. This is because users may not want to retry when taking consistent snapshots or scheduled snapshots when the timing of the snapshot creation is important. In a future version, a maxRetries flag or retry termination timestamp will be added to allow users to control whether retries are needed.
 
 
 #### Changes in CSI External Provisioner
