@@ -11,8 +11,6 @@ As the initial effort to support snapshot in Kubernetes, volume snapshotting has
 
 To continue that effort, this design is proposed to add the snapshot support for CSI Volume Drivers. Because the overal trend in Kubernetes is to keep the core APIs as small as possible and use CRD for everything else, this proposal adds CRD definitions to represent snapshots, and an external snapshot controller to handle volume snapshotting. Out-of-tree external provisioner can be upgraded to support creating volume from snapshot. In this design, only CSI volume drivers will be supported. The CSI snapshot spec is proposed [here](https://github.com/container-storage-interface/spec/pull/224).
 
-To be consistent with the existing CSI Volume Driver support documented [here](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/container-storage-interface.md), a sidecar "Kubernetes to CSI" proxy container called "external-snapshotter" will be provided to watch the Kubernetes API on behalf of the out-of-tree CSI Volume Driver and trigger the appropriate operations (i.e., create snapshot and delete snapshot) against the "CSI Volume Driver" container. 
-
 
 ## Objectives
 
