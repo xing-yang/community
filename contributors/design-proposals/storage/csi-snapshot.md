@@ -95,7 +95,7 @@ type VolumeSnapshotSpec struct {
 type VolumeSnapshotStatus struct {
         // CreatedAt is the time the snapshot was successfully created. If it is set,
 	// it means the snapshot was created, and application can be resumed if it was
-	// previiously frozen before taking the snapshot; Otherwise the snapshot was not created.
+	// previously frozen before taking the snapshot; Otherwise the snapshot was not created.
         // +optional
         CreatedAt *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
 
@@ -107,7 +107,12 @@ type VolumeSnapshotStatus struct {
         // Otherwise the snapshot was not available.
         // +optional
         AvailableAt *metav1.Time `json:"availableAt" protobuf:"bytes,2,opt,name=availableAt"`
-
+	
+	// Setting Bound to true means that the snapshot is created (and uploaded) sucuessfully, and 
+	// VolumeSnapshotContent is created and binded with the VolumeSnapshot. After Bound is true, users
+	// can start use VolumeSnapshot to provision new volumes.
+	Bound bool
+	
 	// The last error encountered during create snapshot operation, if any.
 	// This field must only be set by the entity completing the create snapshot
 	// operation, i.e. the external-snapshotter.
