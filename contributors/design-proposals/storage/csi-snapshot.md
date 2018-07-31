@@ -44,7 +44,7 @@ In this proposal, volume snapshots are considered as another type of storage res
 
 ### Snapshot API Design
 
-The API design of VolumeSnapshot and VolumeSnapshotContent is modeled after PersistentVolumeClaim and PersistentVolume. In the first version, the VolumeSnapshot lifecycle is completely independent of its volumes source (PVC). When PVC/PV is deleted, the corresponding VolumeSnapshot and VolumeSnapshotContents objects will continue to exist.
+The API design of VolumeSnapshot and VolumeSnapshotContent is modeled after PersistentVolumeClaim and PersistentVolume. In the first version, the VolumeSnapshot lifecycle is completely independent of its volumes source (PVC). When PVC/PV is deleted, the corresponding VolumeSnapshot and VolumeSnapshotContents objects will continue to exist. However, for some volume plugins, snapshots have a dependency on their volumes. In a future version, we plan to have a complete lifecycle management which can better handler the relationship between snapshots and their volumes. (e.g., a finalizer to prevent deleting volumes while there are snapshots depending on them).
 
 #### The `VolumeSnapshot` Object
 
@@ -215,7 +215,7 @@ type VolumeSnapshotClass struct {
 ```
 ### Volume API Changes
 
-With Snapshot API avaialble, users could provision volumes from snapshot and data will be prepopulated to the volumes. Also considering clone and other possible storage operations, there could be many different types of sources used for populating the data to the volumes. In this proposal, we add a general "DataSource" which could be used to represent different types of data sources.
+With Snapshot API available, users could provision volumes from snapshot and data will be prepopulated to the volumes. Also considering clone and other possible storage operations, there could be many different types of sources used for populating the data to the volumes. In this proposal, we add a general "DataSource" which could be used to represent different types of data sources.
 
 #### The `DataSource` Object in PVC
 
