@@ -108,12 +108,12 @@ type VolumeSnapshotStatus struct {
 	// +optional
 	CreationTime *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
 
-	// Bound is set to true only if the snapshot is ready to use (e.g., finish uploading if
+	// Ready is set to true only if the snapshot is ready to use (e.g., finish uploading if
 	// there is an uploading phase) and also VolumeSnapshot and its VolumeSnapshotContent
-	// bind correctly with each other. If any of the above condition is not true, Bound is
+	// bind correctly with each other. If any of the above condition is not true, Ready is
 	// set to false
 	// +optional
-	Bound bool `json:"bound" protobuf:"varint,2,opt,name=bound"`
+	Ready bool `json:"ready" protobuf:"varint,2,opt,name=ready"`
 
 	// The last error encountered during create snapshot operation, if any.
 	// This field must only be set by the entity completing the create snapshot
