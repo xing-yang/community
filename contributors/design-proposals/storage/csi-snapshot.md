@@ -50,63 +50,71 @@ The API design of VolumeSnapshot and VolumeSnapshotContent is modeled after Pers
 
 ```GO
 
-// The volume snapshot object accessible to the user. Upon successful creation of the actual
-// snapshot by the volume provider it is bound to the corresponding VolumeSnapshotContent through
-// the VolumeSnapshotSpec
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeSnapshot is a user's request for taking a snapshot. Upon successful creation of the actual
+// snapshot by the volume provider it is bound to the corresponding VolumeSnapshotContent. 
+// Only the VolumeSnapshot object is accessible to the user in the namespace. 
 type VolumeSnapshot struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec represents the desired state of the snapshot
+	// Spec defines the desired characteristics of a snapshot requested by a user.
 	Spec VolumeSnapshotSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status represents the latest observer state of the snapshot
+	// Status represents the latest observed state of the snapshot
 	// +optional
-	Status VolumeSnapshotStatus `json:"status" protobuf:"bytes,3,opt,name=status"`
+	Status VolumeSnapshotStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeSnapshotList is a list of VolumeSnapshot objects
 type VolumeSnapshotList struct {
 	metav1.TypeMeta `json:",inline"`
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items           []VolumeSnapshot `json:"items"`
+	// Items is the list of VolumeSnapshots
+	Items []VolumeSnapshot `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// VolumeSnapshotSpec is the desired state of the volume snapshot
+// VolumeSnapshotSpec describes the common attributes of a volume snapshot
 type VolumeSnapshotSpec struct {
-        // PersistentVolumeClaimName is the name of the PVC being snapshotted
-        // +optional
-        PersistentVolumeClaimName string `json:"persistentVolumeClaimName" protobuf:"bytes,1,opt,name=persistentVolumeClaimName"`
+	// Source has the information about where the snapshot is created from.
+	// In Alpha version, only PersistentVolumeClaim is supported as the source.
+	// If not specified, user can create VolumeSnapshotContent and bind it with VolumeSnapshot manually.
+	// +optional
+	Source *TypedLocalObjectReference `json:"source" protobuf:"bytes,1,opt,name=source"`
 
-        // SnapshotContentName binds the VolumeSnapshot object with the VolumeSnapshotContent
-        // +optional
-        SnapshotContentName string `json:"snapshotContentName" protobuf:"bytes,2,opt,name=snapshotContentName"`
+	// SnapshotContentName binds the VolumeSnapshot object with the VolumeSnapshotContent
+	// +optional
+	SnapshotContentName string `json:"snapshotContentName" protobuf:"bytes,2,opt,name=snapshotContentName"`
 
-        // Name of the VolumeSnapshotClass required by the volume snapshot.
-        // +optional
-        VolumeSnapshotClassName string `json:"storageClassName" protobuf:"bytes,3,opt,name=storageClassName"`
+	// Name of the VolumeSnapshotClass used by the VolumeSnapshot. If not specified, a default snapshot class will
+	// be used if it is available.
+	// +optional
+	VolumeSnapshotClassName string `json:"snapshotClassName" protobuf:"bytes,3,opt,name=snapshotClassName"`
 }
 
+// VolumeSnapshotStatus is the status of the VolumeSnapshot
 type VolumeSnapshotStatus struct {
-        // CreatedAt is the time when the snapshot was successfully created. When it is set,
-	// users can start to resume/unfreeze the application if it was previously frozen 
-	// before taking the snapshot.
-        // +optional
-        CreatedAt *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
+	// CreationTime is the time the snapshot was successfully created. If it is set,
+	// it means the snapshot was created; Otherwise the snapshot was not created.
+	// +optional
+	CreationTime *metav1.Time `json:"createdAt" protobuf:"bytes,1,opt,name=createdAt"`
 
-        // AvailableAt is the time when the snapshot was successfully created and available
-	// to use. Some cloud volume providers upload the snapshot to cloud storage after
-	// it is created, so the snapshot will become available some time after snapshot is created.
-	// For other plugins, the snapshot might be available at the same time when the snapshot 
-	// is created.
-        // +optional
-        AvailableAt *metav1.Time `json:"availableAt" protobuf:"bytes,2,opt,name=availableAt"`
-	
-	// Setting Bound to true means that the snapshot is created (and uploaded for cloud providers) sucuessfully, and 
-	// VolumeSnapshotContent is created and bound with the VolumeSnapshot. After Bound becomes true, users
-	// can start to use VolumeSnapshot to provision new volumes.
-	Bound bool `json:"bound" protobuf:"varint,4,opt,name=bound"`
-	
+	// Bound is set to true only if the snapshot is ready to use (e.g., finish uploading if
+	// there is an uploading phase) and also VolumeSnapshot and its VolumeSnapshotContent
+	// bind correctly with each other. If any of the above condition is not true, Bound is
+	// set to false
+	// +optional
+	Bound bool `json:"bound" protobuf:"varint,2,opt,name=bound"`
+
 	// The last error encountered during create snapshot operation, if any.
 	// This field must only be set by the entity completing the create snapshot
 	// operation, i.e. the external-snapshotter.
@@ -122,44 +130,51 @@ Note that if an error occurs before the snapshot is cut, `Error` will be set and
 
 ```GO
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeSnapshotContent represents the actual "on-disk" snapshot object
 type VolumeSnapshotContent struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec represents the desired state of the snapshot content
+	// Spec represents the desired state of the snapshot data
 	Spec VolumeSnapshotContentSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // VolumeSnapshotContentList is a list of VolumeSnapshotContent objects
 type VolumeSnapshotContentList struct {
-        metav1.TypeMeta `json:",inline"`
-        Metadata        metav1.ListMeta      `json:"metadata"`
-        Items           []VolumeSnapshotContent `json:"items"`
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of VolumeSnapshotContents
+	Items []VolumeSnapshotContent `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// The desired state of the volume snapshot data
+// VolumeSnapshotContentSpec is the spec of the volume snapshot data
 type VolumeSnapshotContentSpec struct {
 	// Source represents the location and type of the volume snapshot
 	VolumeSnapshotSource `json:",inline" protobuf:"bytes,1,opt,name=volumeSnapshotSource"`
 
 	// VolumeSnapshotRef is part of bi-directional binding between VolumeSnapshot
-	// and VolumeSnapshotContent
+	// and VolumeSnapshotContent. It becomes non-nil when bound.
 	// +optional
 	VolumeSnapshotRef *core_v1.ObjectReference `json:"volumeSnapshotRef" protobuf:"bytes,2,opt,name=volumeSnapshotRef"`
 
 	// PersistentVolumeRef represents the PersistentVolume that the snapshot has been
-	// taken from
+	// taken from. It becomes non-nil when VolumeSnapshot and VolumeSnapshotContent are bound.
 	// +optional
 	PersistentVolumeRef *core_v1.ObjectReference `json:"persistentVolumeRef" protobuf:"bytes,3,opt,name=persistentVolumeRef"`
 }
 
-// Represents the actual location and type of the snapshot.
-// Only CSI volume snapshot source is supported now.
+// VolumeSnapshotSource represents the actual location and type of the snapshot. Only one of its members may be specified.
 type VolumeSnapshotSource struct {
 	// CSI (Container Storage Interface) represents storage that handled by an external CSI Volume Driver (Alpha feature).
 	// +optional
@@ -168,20 +183,21 @@ type VolumeSnapshotSource struct {
 
 // Represents the source from CSI volume snapshot
 type CSIVolumeSnapshotSource struct {
-        // Driver is the name of the driver to use for this snapshot.
-        // Required.
-        Driver string `json:"driver"`
+	// Driver is the name of the driver to use for this snapshot.
+	// Required.
+	Driver string `json:"driver"`
 
-        // SnapshotHandle is the unique snapshot id returned by the CSI volume
-        // plugin’s CreateSnapshot to refer to the snapshot on all subsequent calls.
-        // Required.
-        SnapshotHandle string `json:"snapshotHandle"`
+	// SnapshotHandle is the unique snapshot id returned by the CSI volume
+	// plugin’s CreateSnapshot to refer to the snapshot on all subsequent calls.
+	// Required.
+	SnapshotHandle string `json:"snapshotHandle"`
 
-        // Timestamp when the point-in-time snapshot is taken on the storage
-        // system. The format of this field should be a Unix nanoseconds time
-        // encoded as an int64. On Unix, the command `date +%s%N` returns
-        // the  current time in nanoseconds since 1970-01-01 00:00:00 UTC.
-        // This field is REQUIRED.
+	// Timestamp when the point-in-time snapshot is taken on the storage
+	// system. This timestamp will be generated by the CSI volume driver after
+	// the snapshot is cut. The format of this field should be a Unix nanoseconds
+	// time encoded as an int64. On Unix, the command `date +%s%N` returns
+	// the  current time in nanoseconds since 1970-01-01 00:00:00 UTC.
+	// This field is REQUIRED.
 	CreatedAt int64 `json:"createdAt,omitempty" protobuf:"varint,3,opt,name=createdAt"`
 }
 
@@ -193,22 +209,29 @@ A new VolumeSnapshotClass API object will be added instead of resuing the existi
 
 ```
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeSnapshotClass describes the parameters used by storage system when
+// provisioning VolumeSnapshots from PVCs.
+// The name of a VolumeSnapshotClass object is significant, and is how users can request a particular class.
+
 type VolumeSnapshotClass struct {
-        metav1.TypeMeta `json:",inline"`
-        // +optional
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Snapshotter is the driver expected to handle this VolumeSnapshotClass.
-	// This value may not be empty.
-	Snapshotter string
+	Snapshotter string `json:"snapshotter" protobuf:"bytes,2,opt,name=snapshotter"`
 
 	// Parameters holds parameters for the snapshotter.
-        // These values are opaque to the system and are passed directly
-        // to the snapshotter. The only validation done on keys is that they are
-        // not empty. The maximum number of parameters is
-        // 512, with a cumulative max size of 256K
-        // +optional
-	Parameters map[string]string
+	// These values are opaque to the system and are passed directly
+	// to the snapshotter.
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 }
 
 
@@ -229,15 +252,15 @@ Possible `DataSource` types may include the following:
 ```
 
 type PersistentVolumeClaimSpec struct {
-        // If specified, volume will be prepopulated with data from the PVCDataSourceRef.
+        // If specified when creating, volume will be prepopulated with data from the DataSource.
         // +optional
-        DataSourceRef *TypedLocalObjectReference `json:"dataSourceRef" protobuf:"bytes,2,opt,name=dataSourceRef"`
+        DataSource *TypedLocalObjectReference `json:"dataSource" protobuf:"bytes,2,opt,name=dataSource"`
 }
 
 type PersistentVolumeSpec struct {
-        // If specified, volume will be prepopulated with data from the PVCDataSourceRef.
+        // If specified, volume will be prepopulated with data from the DataSource.
         // +optional
-        DataSourceRef *ypedLocalObjectReference `json:"dataSourceRef" protobuf:"bytes,2,opt,name=dataSourceRef"`
+        DataSource *ypedLocalObjectReference `json:"dataSource" protobuf:"bytes,2,opt,name=dataSource"`
 }
 
 ```
