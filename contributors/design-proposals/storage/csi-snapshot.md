@@ -307,7 +307,7 @@ As the figure below shows, the CSI snapshot controller architecture consists of 
 
 * For dynamically created snapshot, it should have a VolumeSnapshotClass associated with it. User can explicitly specify a VolumeSnapshotClass in the VolumeSnapshot API object. If user does not specify a VolumeSnapshotClass, a default VolumeSnapshotClass created by the admin will be used. This is similar to how a default StorageClass created by the admin will be used for the provisioning of a PersistentVolumeClaim.
 
-* For statically binding snapshot, user/admin must specify pointers for both VolumeSnapshot and VolumeSnapshotContent, so that the controller knows how to bind them.
+* For statically binding snapshot, user/admin must specify bi-pointers correctly for both VolumeSnapshot and VolumeSnapshotContent, so that the controller knows how to bind them. Otherwise, if VolumeSnapshot points to a non-exist VolumeSnapshotContent, or VolumeSnapshotContent does not point back to the VolumeSnapshot, the Error status will be set for VolumeSnapshot
 
 * External snapshotter is running in the sidecar along with external-attacher and external-provisioner for each CSI Volume Driver.
 
