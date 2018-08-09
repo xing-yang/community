@@ -216,7 +216,6 @@ A new VolumeSnapshotClass API object will be added instead of resuing the existi
 // VolumeSnapshotClass describes the parameters used by storage system when
 // provisioning VolumeSnapshots from PVCs.
 // The name of a VolumeSnapshotClass object is significant, and is how users can request a particular class.
-
 type VolumeSnapshotClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -242,7 +241,7 @@ With Snapshot API available, users could provision volumes from snapshot and dat
 
 #### The `DataSource` Object in PVC
 
-Add a new `DataSource` field into both PVC and PV to represent the source of the data which is prepopulated to the provisioned volume. If an external-provisioner does not understand the new `DataSource` field and does not pre-populate the new volume, PV/PVC controller should be able to detect that (e.g. PVC has `DataSource` but PV does not) and fail the operation.
+Add a new `DataSource` field into both PVC and PV to represent the source of the data which is prepopulated to the provisioned volume. If an external-provisioner does not understand the new `DataSource` field and does not pre-populate the new volume, PV/PVC controller should be able to detect that (e.g. PVC has `DataSource` but PV does not) and fail the operation. Please see more details in [here](https://github.com/kubernetes/community/pull/2495)
 
 Possible `DataSource` types may include the following:
 
@@ -280,21 +279,6 @@ type TypedLocalObjectReference struct {
 ```
 
 In the first version, only VolumeSnapshot is the supported `Type` for data source object reference. Other types will be added in a future version. If unsupported `Type` is used, the PV Controller SHALL fail the operation.
-
-
-#### Add `DataSource` to `StorageClass`
-
-DataSource will be added as an optional parameter in `StorageClass` to allow volumes belonging to the same `StorageClass` to be created with prepopulated data.
-
-```
-
-type StorageClass struct {
-        // If specified, volume will be prepouplated with data from the DataSource
-        // +optional
-        DataSource TypedLocalObjectReference
-}
-
-```
 
 
 ### Snapshot Controller Design
