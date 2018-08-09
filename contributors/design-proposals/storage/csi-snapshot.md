@@ -134,7 +134,7 @@ Note that if an error occurs before the snapshot is cut, `Error` will be set and
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// VolumeSnapshotContent represents the actual "on-disk" snapshot object
+// VolumeSnapshotContent represents the actual snapshot object
 type VolumeSnapshotContent struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -142,7 +142,7 @@ type VolumeSnapshotContent struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec represents the desired state of the snapshot data
+	// Spec defines a specification of a volume snapshot
 	Spec VolumeSnapshotContentSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -158,7 +158,7 @@ type VolumeSnapshotContentList struct {
 	Items []VolumeSnapshotContent `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// VolumeSnapshotContentSpec is the spec of the volume snapshot data
+// VolumeSnapshotContentSpec is the spec of the volume snapshot content
 type VolumeSnapshotContentSpec struct {
 	// Source represents the location and type of the volume snapshot
 	VolumeSnapshotSource `json:",inline" protobuf:"bytes,1,opt,name=volumeSnapshotSource"`
